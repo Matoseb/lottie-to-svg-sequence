@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Lottie Sequence to SVG Sequence</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/1.3.8/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.5.8/lottie.min.js"></script>
+    <style>
+        html, body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #lottie {
+            position: relative;
+            flex: 1 0 auto;
+            display: flex;
+            padding: 50px;
+            box-sizing: border-box;
+        }
+
+        #lottie svg {
+            flex: 1 0 auto;
+        }
+
+        #controls {
+            background: lightblue;
+            flex: 0 0 auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="lottie"></div>
+    <div id="controls">
+        <input id="fileTransfer" type="file">
+        <button disabled="true">download</button>
+    </div>
+    <script>
+    const input = document.querySelector('#fileTransfer'),
+        btn = document.querySelector('button'),
+        widthInput = document.querySelector('#width'),
+        heightInput = document.querySelector('#height'),
+        container = document.querySelector('#lottie');
+
+    input.oninput = function(e) {
+        this.disabled = btn.disabled = true;
+
+        const reader = new FileReader(),
+            name = this.files[0].name;
+
+        reader.onload = function(e) {
+            play(e.target.result, name);
+        }
+
+        reader.readAsText(this.files[0]);
+    }
+
+    function download(filename, text) {
+        let blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        saveAs(blob, filename);
+        container.disabled = false;
+    }
+
+    function play(jsonString, name) {
+
+        let currFrame = 0,
+            result = { frameRate: 0, data: [] };
+
+        const anim = bodymovin.loadAnimation({
+            wrapper: container,
+            animType: "svg",
+            loop: false,
+            animationData: JSON.parse(jsonString),
+            autoplay: false,
+            rendererSettings: {
+                progressiveLoad: true,
+                scaleMode: 'noScale',
+                viewBoxOnly: true,
+                preserveAspectRatio: 'xMidYMid meet',
+            }
+        });
+
+        anim.onEnterFrame = _ => {
+
+            if (currFrame < anim.totalFrames - 1) {
+
+                requestAnimationFrame(() => {
+                    console.log('.');
+
+                    result.data.push(container.innerHTML);
+                    goToFrame(++currFrame);
+                });
+
+            } else {
+
+                let viewBox = container.firstElementChild.getAttribute("viewBox");
+                viewBox = viewBox.split(" ").map(e => parseFloat(e));
+
+                result.width = viewBox[2] - viewBox[0];
+                result.height = viewBox[3] - viewBox[1];
+
+                btn.disabled = false;
+
+                result = JSON.stringify(result);
+
+                btn.onclick = () => download('exported_' + name, result);
+                anim.onEnterFrame = null;
+                // anim.destroy();
+                console.log('done');
+            }
+        };
+
+        goToFrame(currFrame);
+
+        result.frameRate = anim.frameRate;
+
+        function goToFrame(frame) {
+            anim.goToAndStop(frame, true);
+        }
+    }
+    </script>
+</body>
+
+</html>
